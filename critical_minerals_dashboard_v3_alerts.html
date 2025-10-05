@@ -1,0 +1,450 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="900"> <!-- Auto-refresh every 15 minutes -->
+  <title>Critical Minerals Policy Dashboard — v3 (Alerts)</title>
+  <style>
+    body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
+    header { padding: 24px; background: #11192d; border-bottom: 1px solid #23324f; }
+    h1 { margin: 0 0 6px 0; font-size: 24px; }
+    h2 { margin-top: 24px; font-size: 20px; }
+    p, li { color: #b8c3d6; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 16px 24px 40px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    .card { background: #0f1a33; border: 1px solid #22345a; border-radius: 12px; padding: 16px; }
+    .two-col { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+      .two-col { grid-template-columns: 1fr 1fr; }
+    }
+    .pill { display: inline-block; padding: 4px 10px; border: 1px solid #2d4472; border-radius: 999px; margin-right: 8px; font-size: 12px; color: #c8d6ef; }
+    a { color: #8ab4ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .matrix { width: 100%; border-collapse: collapse; }
+    .matrix th, .matrix td { border: 1px solid #23324f; padding: 8px 10px; text-align: left; }
+    .matrix th { background: #0d1630; }
+    .ok { color: #8fe388; font-weight: 600; }
+    .warn { color: #ffd36e; font-weight: 600; }
+    .badge { padding: 3px 8px; border-radius: 6px; background: #1a2b4f; border: 1px solid #2c4578; margin-left: 8px; font-size: 12px; }
+    .tiny { font-size: 12px; color: #8aa0c8; }
+    .right { text-align: right; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom: 1px solid #23324f; padding: 8px 10px; }
+    .gain { color: #86efac; }
+    .loss { color: #fca5a5; }
+    .btn { background:#1a2b4f; color:#cfe0ff; border:1px solid #2c4578; border-radius:8px; padding:8px 12px; cursor:pointer; }
+    .btn:hover { background:#233a6a; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    /* Alert flash */
+    @keyframes flashGreen { 0%{background:#0f1a33;} 50%{background:#10351f;} 100%{background:#0f1a33;} }
+    @keyframes flashRed { 0%{background:#0f1a33;} 50%{background:#3a1b1b;} 100%{background:#0f1a33;} }
+    .flashUp { animation: flashGreen 1.2s ease-in-out 4; }
+    .flashDown { animation: flashRed 1.2s ease-in-out 4; }
+    .alertInput { width: 70px; background:#0f1a33; border:1px solid #2c4578; color:#cfe0ff; padding:6px 8px; border-radius:6px; }
+    .inline-note { font-size:12px; color:#8aa0c8; margin-left:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>U.S. Policy Critical Minerals Dashboard <span class="badge">v3</span></h1>
+      <p class="tiny">Auto-refreshes every 15 minutes • Live prices fetched client-side • P&L baseline captured on first open (USD notional) • Per-symbol alert thresholds</p>
+      <div>
+        <span class="pill">MP</span><span class="pill">LYSDY</span><span class="pill">ABAT</span><span class="pill">NVX</span>
+        <span class="pill">WWR</span><span class="pill">LAC</span><span class="pill">METC</span><span class="pill">NB</span>
+        <span class="pill">URA</span><span class="pill">REMX</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h2 style="margin:0;">Portfolio P&L (USD)</h2>
+        <div class="row">
+          <button class="btn" id="setBaseline">Set Baseline Now</button>
+          <button class="btn" id="resetBaseline">Reset / Clear Baseline</button>
+        </div>
+      </div>
+      <p class="tiny">Baseline uses a <strong>$1,000 USD notional</strong> allocated by your weights on first open (or when you click “Set Baseline”). Quantities are computed from baseline prices so performance tracks regardless of FX.</p>
+      <table class="table" id="pnlTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th class="right">Weight</th>
+            <th class="right">Qty @ Baseline</th>
+            <th class="right">Baseline Price ($)</th>
+            <th class="right">Baseline Value ($)</th>
+            <th class="right">Live Price ($)</th>
+            <th class="right">Live Value ($)</th>
+            <th class="right">P&L %</th>
+            <th class="right">Alert ±%</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <th>Total</th>
+            <th class="right" id="totW"></th>
+            <th></th>
+            <th></th>
+            <th class="right" id="totBase"></th>
+            <th></th>
+            <th class="right" id="totLive"></th>
+            <th class="right" id="totPL"></th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="tiny" id="baselineNote"></p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Catalyst Timeline</h2>
+        <ul>
+          <li><strong>Section 232 Report Window:</strong> Oct–Dec 2025. <span id="countdown232"></span></li>
+          <li><strong>DOE Loan & Grants Windows:</strong> Rolling announcements; watch ABAT, LAC, NVX.</li>
+          <li><strong>DPA / DoD Contracts:</strong> Ongoing; key for MP, LYSDY, NB.</li>
+          <li><strong>Election Policy Cycle:</strong> 2026 — resource independence rhetoric likely supportive.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Policy Exposure Map</h2>
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Company</th><th>DOE Loans</th><th>DPA / DoD</th><th>IRA Credits</th><th>232 Tariff Sensitivity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>MP</td><td></td><td class="ok">High</td><td></td><td class="ok">High</td></tr>
+            <tr><td>LYSDY</td><td></td><td class="ok">High</td><td></td><td class="ok">High</td></tr>
+            <tr><td>ABAT</td><td class="ok">High</td><td></td><td class="ok">High</td><td class="warn">Medium</td></tr>
+            <tr><td>NVX</td><td class="warn">Medium</td><td></td><td class="ok">High</td><td class="ok">High</td></tr>
+            <tr><td>WWR</td><td class="warn">Medium</td><td></td><td></td><td class="ok">High</td></tr>
+            <tr><td>LAC</td><td class="ok">High</td><td></td><td class="warn">Medium</td><td class="warn">Medium</td></tr>
+            <tr><td>METC</td><td class="warn">Medium</td><td></td><td></td><td class="warn">Medium</td></tr>
+            <tr><td>NB</td><td class="warn">Medium</td><td class="ok">High</td><td></td><td class="warn">Medium</td></tr>
+          </tbody>
+        </table>
+        <p class="tiny">Legend: <span class="ok">High</span> = direct program fit; <span class="warn">Medium</span> = indirect/likely.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Benchmarks & News</h2>
+      <div class="grid-3">
+        <div>
+          <div class="tradingview-widget-container">
+            <div id="uraChart"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+            {
+              "symbol": "AMEX:URA",
+              "dateRange": "3M",
+              "locale": "en",
+              "colorTheme": "dark",
+              "isTransparent": false,
+              "autosize": true,
+              "height": 220
+            }
+            </script>
+          </div>
+          <p class="tiny">URA — Uranium ETF (for the UUUU theme)</p>
+        </div>
+        <div>
+          <div class="tradingview-widget-container">
+            <div id="remxChart"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+            {
+              "symbol": "AMEX:REMX",
+              "dateRange": "3M",
+              "locale": "en",
+              "colorTheme": "dark",
+              "isTransparent": false,
+              "autosize": true,
+              "height": 220
+            }
+            </script>
+          </div>
+          <p class="tiny">REMX — Rare Earth/Strategic Metals ETF</p>
+        </div>
+        <div>
+          <p class="tiny">Quick News Links</p>
+          <ul>
+            <li><a target="_blank" href="https://www.google.com/search?q=site%3Aenergy.gov+%22critical+minerals%22">Energy.gov — “critical minerals”</a></li>
+            <li><a target="_blank" href="https://www.google.com/search?q=%22Section+232%22+critical+minerals">“Section 232” critical minerals</a></li>
+            <li><a target="_blank" href="https://www.google.com/search?q=DOE+Loan+Program+Office+battery+recycling">DOE Loan Program — battery recycling</a></li>
+            <li><a target="_blank" href="https://www.google.com/search?q=site%3Adefense.gov+rare+earths+contract">Defense.gov — rare earths contract</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h2>Signal Lights</h2>
+        <ul>
+          <li><strong>Tariff Window (232):</strong> <span id="signal-232" class="badge">Calculating…</span></li>
+          <li><strong>DOE/DPA Announcements:</strong> <span class="badge">Rolling • Watch ABAT, LAC, NVX</span></li>
+          <li><strong>Public–Private Deals:</strong> <span class="badge">Ongoing • MP, LYSDY</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Alert Log</h2>
+        <ul id="alertLog" class="tiny" style="max-height:220px; overflow:auto; padding-left:18px; margin:0;"></ul>
+        <p class="tiny">Alerts trigger when a symbol's P&L % (vs your baseline) crosses your ±% threshold. Visual flash only (no browser pop-ups).</p>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="container">
+      <p class="tiny">This dashboard is informational only and not investment advice.</p>
+    </div>
+  </footer>
+
+  <!-- TradingView base -->
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+  <script>
+    // ---------- COUNTDOWN / SIGNALS ----------
+    const target = new Date('2025-12-31T23:59:59Z').getTime();
+    function updateCountdown() {
+      const now = new Date().getTime();
+      const diff = target - now;
+      if (diff <= 0) {
+        document.getElementById('countdown232').textContent = 'Window complete';
+        document.getElementById('signal-232').textContent = 'Complete';
+        document.getElementById('signal-232').style.background = '#3a2030';
+        return;
+      }
+      const days = Math.floor(diff / (1000*60*60*24));
+      const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+      const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+      document.getElementById('countdown232').textContent = days + 'd ' + hours + 'h ' + mins + 'm';
+      const badge = document.getElementById('signal-232');
+      if (days <= 30) { badge.textContent = 'Now • High Alert'; badge.style.background = '#1e3f2b'; }
+      else if (days <= 90) { badge.textContent = 'Approaching • Watch Closely'; badge.style.background = '#2a3a1f'; }
+      else { badge.textContent = 'Upcoming • Monitor'; badge.style.background = '#1a2b4f'; }
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 60000);
+
+    // ---------- P&L + ALERT LOGIC ----------
+    const symbols = [
+      { sym: 'MP', yFull: 'MP' },
+      { sym: 'LYSDY', yFull: 'LYSDY' },
+      { sym: 'ABAT', yFull: 'ABAT' },
+      { sym: 'NVX', yFull: 'NVX' },
+      { sym: 'WWR', yFull: 'WWR' },
+      { sym: 'LAC', yFull: 'LAC' },
+      { sym: 'METC', yFull: 'METC' },
+      { sym: 'NB', yFull: 'NB' }
+    ];
+    const weights = { MP:0.20, LYSDY:0.15, ABAT:0.15, NVX:0.15, WWR:0.10, LAC:0.10, METC:0.10, NB:0.05 };
+    const NOTIONAL = 1000; // USD
+    const baselineKey = 'cm_dashboard_baseline_v3';
+    const baselineAtKey = 'cm_dashboard_baseline_at_v3';
+    const alertsKey = 'cm_alerts_v3';
+    const alertLogKey = 'cm_alertlog_v3';
+    const quoteUrl = (tickers) => `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(tickers.join(','))}`;
+
+    // Best-practice default thresholds (±%): higher beta -> wider band
+    const defaultAlerts = { MP:7, LYSDY:7, ABAT:10, NVX:10, WWR:15, LAC:10, METC:8, NB:12 };
+
+    function fmt(n, d=2){ return Number(n).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d}); }
+    function cls(v){ return v>=0 ? 'gain' : 'loss'; }
+    function readLS(key, fallback){ try{ const x = JSON.parse(localStorage.getItem(key)); return x ?? fallback; }catch(e){ return fallback; } }
+    function writeLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+    function alertLogPush(entry){
+      const log = readLS(alertLogKey, []);
+      log.unshift(entry);
+      writeLS(alertLogKey, log.slice(0, 100)); // keep last 100
+      renderAlertLog();
+    }
+    function renderAlertLog(){
+      const log = readLS(alertLogKey, []);
+      const ul = document.getElementById('alertLog');
+      ul.innerHTML = '';
+      log.forEach(e => {
+        const li = document.createElement('li');
+        li.textContent = `[${new Date(e.t).toLocaleString()}] ${e.sym} crossed ±${e.th}% → ${fmt(e.pl,2)}%`;
+        ul.appendChild(li);
+      });
+    }
+
+    async function fetchQuotes() {
+      const tickers = symbols.map(s => s.yFull);
+      const res = await fetch(quoteUrl(tickers));
+      const json = await res.json();
+      const by = {};
+      (json.quoteResponse.result || []).forEach(q => { by[q.symbol] = q; });
+      return by;
+    }
+
+    function buildBaseline(quotes) {
+      const baseline = {};
+      symbols.forEach(s => {
+        const q = quotes[s.yFull];
+        const px = q && (q.regularMarketPrice ?? q.ask ?? q.bid);
+        if (!px) return;
+        const alloc = NOTIONAL * weights[s.sym];
+        const qty = alloc / px;
+        baseline[s.sym] = { price: px, qty: qty };
+      });
+      writeLS(baselineKey, baseline);
+      writeLS(baselineAtKey, new Date().toISOString());
+      return baseline;
+    }
+
+    function readBaseline(){ return readLS(baselineKey, null); }
+
+    function baselineNote(){
+      const at = localStorage.getItem(baselineAtKey);
+      const el = document.getElementById('baselineNote');
+      if (at) el.textContent = 'Baseline captured: ' + new Date(at).toLocaleString() + ' • Notional: $'+NOTIONAL;
+      else el.textContent = 'No baseline set yet. Click “Set Baseline Now” to lock today’s prices.';
+    }
+
+    function getAlerts(){
+      const a = readLS(alertsKey, {});
+      // seed defaults if missing
+      let changed = false;
+      symbols.forEach(s => {
+        if (a[s.sym] == null) { a[s.sym] = defaultAlerts[s.sym] ?? 10; changed = true; }
+      });
+      if (changed) writeLS(alertsKey, a);
+      return a;
+    }
+
+    function setAlert(sym, th){
+      const a = getAlerts();
+      a[sym] = th;
+      writeLS(alertsKey, a);
+    }
+
+    async function renderPnL() {
+      const tbody = document.querySelector('#pnlTable tbody');
+      tbody.innerHTML = '<tr><td colspan="9">Loading quotes…</td></tr>';
+      try {
+        const quotes = await fetchQuotes();
+        let base = readBaseline();
+        if (!base) { base = buildBaseline(quotes); }
+        baselineNote();
+        const alerts = getAlerts();
+
+        let totW = 0, totBase = 0, totLive = 0;
+        tbody.innerHTML = '';
+        symbols.forEach(s => {
+          const q = quotes[s.yFull];
+          const live = q && (q.regularMarketPrice ?? q.ask ?? q.bid);
+          const w = weights[s.sym];
+          const b = base[s.sym];
+          if (!live || !b) return;
+          const baseVal = b.qty * b.price;
+          const liveVal = b.qty * live;
+          const plPct = (liveVal - baseVal) / baseVal * 100;
+
+          totW += w*100;
+          totBase += baseVal;
+          totLive += liveVal;
+
+          const tr = document.createElement('tr');
+          tr.id = 'row-' + s.sym;
+          tr.innerHTML = `
+            <td>${s.sym}</td>
+            <td class="right">${fmt(w*100,1)}%</td>
+            <td class="right">${fmt(b.qty,4)}</td>
+            <td class="right">${fmt(b.price)}</td>
+            <td class="right">${fmt(baseVal)}</td>
+            <td class="right">${fmt(live)}</td>
+            <td class="right">${fmt(liveVal)}</td>
+            <td class="right ${cls(plPct)}" id="pl-${s.sym}">${fmt(plPct,2)}%</td>
+            <td class="right">
+              <input type="number" step="0.5" min="1" id="alert-${s.sym}" class="alertInput" value="${alerts[s.sym]}">
+              <span class="inline-note">±%</span>
+            </td>
+          `;
+          tbody.appendChild(tr);
+
+          // Trigger visual alert if crossed
+          const th = Number(alerts[s.sym]);
+          if (th && Math.abs(plPct) >= th) {
+            const row = tr;
+            if (plPct >= 0) row.classList.add('flashUp');
+            else row.classList.add('flashDown');
+            // Log it (only once per refresh per symbol)
+            alertLogPush({ t: new Date().toISOString(), sym: s.sym, th: th, pl: plPct });
+          }
+        });
+
+        document.getElementById('totW').textContent = fmt(totW,1)+'%';
+        document.getElementById('totBase').textContent = '$'+fmt(totBase);
+        document.getElementById('totLive').textContent = '$'+fmt(totLive);
+        const totPl = (totLive - totBase) / (totBase || 1) * 100;
+        document.getElementById('totPL').innerHTML = `<span class="${cls(totPl)}">${fmt(totPl,2)}%</span>`;
+
+        // Wire up inputs to save on change
+        symbols.forEach(s => {
+          const inp = document.getElementById('alert-'+s.sym);
+          inp.addEventListener('change', e => {
+            const v = Number(e.target.value);
+            if (!isNaN(v) && v > 0) setAlert(s.sym, v);
+          });
+        });
+
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9">Quote fetch failed. Try refresh or click “Set Baseline Now”.</td></tr>`;
+      }
+    }
+
+    document.getElementById('setBaseline').addEventListener('click', async () => {
+      const quotes = await fetchQuotes();
+      buildBaseline(quotes);
+      baselineNote();
+      renderPnL();
+    });
+    document.getElementById('resetBaseline').addEventListener('click', () => {
+      localStorage.removeItem(baselineKey);
+      localStorage.removeItem(baselineAtKey);
+      baselineNote();
+      renderPnL();
+    });
+
+    renderAlertLog();
+    renderPnL();
+  </script>
+
+  <!-- TradingView ticker tape -->
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+  {
+    "symbols": [
+      { "proName": "NYSE:MP", "title": "MP" },
+      { "proName": "OTC:LYSDY", "title": "LYSDY" },
+      { "proName": "NASDAQ:ABAT", "title": "ABAT" },
+      { "proName": "NASDAQ:NVX", "title": "NVX" },
+      { "proName": "AMEX:WWR", "title": "WWR" },
+      { "proName": "NYSE:LAC", "title": "LAC" },
+      { "proName": "NASDAQ:METC", "title": "METC" },
+      { "proName": "NASDAQ:NB", "title": "NB" },
+      { "proName": "AMEX:URA", "title": "URA" },
+      { "proName": "AMEX:REMX", "title": "REMX" }
+    ],
+    "colorTheme": "dark",
+    "isTransparent": false,
+    "displayMode": "adaptive",
+    "locale": "en"
+  }
+  </script>
+
+</body>
+</html>
