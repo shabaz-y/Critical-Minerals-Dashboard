@@ -1,0 +1,421 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="900">
+  <title>Critical Minerals Policy Dashboard — v3.3 (Selectable Data Source)</title>
+  <style>
+    body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e6edf3}
+    header{padding:24px;background:#11192d;border-bottom:1px solid #23324f}
+    h1{margin:0 0 6px 0;font-size:24px} h2{margin-top:24px;font-size:20px}
+    p,li{color:#b8c3d6}.container{max-width:1280px;margin:0 auto;padding:16px 24px 40px}
+    .grid{display:grid;grid-template-columns:1fr;gap:20px}.grid-3{display:grid;grid-template-columns:1fr;gap:20px}
+    .card{background:#0f1a33;border:1px solid #22345a;border-radius:12px;padding:16px}.two-col{display:grid;grid-template-columns:1fr;gap:20px}
+    @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr 1fr 1fr}.two-col{grid-template-columns:1fr 1fr}}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #2d4472;border-radius:999px;margin-right:8px;font-size:12px;color:#c8d6ef}
+    a{color:#8ab4ff;text-decoration:none}a:hover{text-decoration:underline}
+    .matrix{width:100%;border-collapse:collapse}.matrix th,.matrix td{border:1px solid #23324f;padding:8px 10px;text-align:left}.matrix th{background:#0d1630}
+    .ok{color:#8fe388;font-weight:600}.warn{color:#ffd36e;font-weight:600}
+    .badge{padding:3px 8px;border-radius:6px;background:#1a2b4f;border:1px solid #2c4578;margin-left:8px;font-size:12px}
+    .tiny{font-size:12px;color:#8aa0c8}.right{text-align:right}.table{width:100%;border-collapse:collapse}
+    .table th,.table td{border-bottom:1px solid #23324f;padding:8px 10px}.gain{color:#86efac}.loss{color:#fca5a5}
+    .btn{background:#1a2b4f;color:#cfe0ff;border:1px solid #2c4578;border-radius:8px;padding:8px 12px;cursor:pointer}.btn:hover{background:#233a6a}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    @keyframes flashGreen{0%{background:#0f1a33}50%{background:#10351f}100%{background:#0f1a33}}
+    @keyframes flashRed{0%{background:#0f1a33}50%{background:#3a1b1b}100%{background:#0f1a33}}
+    .flashUp{animation:flashGreen 1.2s ease-in-out 4}.flashDown{animation:flashRed 1.2s ease-in-out 4}
+    .alertInput{width:70px;background:#0f1a33;border:1px solid #2c4578;color:#cfe0ff;padding:6px 8px;border-radius:6px}
+    .inline-note{font-size:12px;color:#8aa0c8;margin-left:8px}
+    .input{background:#0f1a33;border:1px solid #2c4578;color:#cfe0ff;padding:6px 8px;border-radius:6px}
+    .note{font-size:12px;color:#9fb3d9;margin-top:6px}
+    label{font-size:12px;color:#9fb3d9;margin-right:6px}
+    .kbd{background:#182646;border:1px solid #2c4578;border-radius:4px;padding:0 6px}
+  </style>
+</head>
+<body>
+<header><div class="container">
+  <h1>U.S. Policy Critical Minerals Dashboard <span class="badge">v3.3</span></h1>
+  <p class="tiny">Auto-refresh every 15 min • <strong>Selectable data source</strong> (Finnhub API key supported) • USD P&L baseline • Per-symbol alerts</p>
+  <div><span class="pill">MP</span><span class="pill">LYSDY</span><span class="pill">ABAT</span><span class="pill">NVX</span><span class="pill">WWR</span><span class="pill">LAC</span><span class="pill">METC</span><span class="pill">NB</span><span class="pill">URA</span><span class="pill">REMX</span></div>
+</div></header>
+
+<div class="container">
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h2 style="margin:0;">Portfolio P&L (USD)</h2>
+      <div class="row">
+        <button class="btn" id="setBaseline">Set Baseline Now</button>
+        <button class="btn" id="resetBaseline">Reset / Clear Baseline</button>
+      </div>
+    </div>
+    <p class="tiny">Baseline uses a <strong>$1,000 USD notional</strong> allocated by your weights on first open (or when you click “Set Baseline”). Quantities are computed from baseline prices so performance tracks regardless of FX.</p>
+
+    <div class="row" style="margin:10px 0;">
+      <label for="sourceSel">Data source:</label>
+      <select id="sourceSel" class="input">
+        <option value="auto">Auto (Finnhub → Yahoo → Proxies)</option>
+        <option value="finnhub">Finnhub (requires API key)</option>
+        <option value="yahoo">Yahoo (may need proxies)</option>
+        <option value="manual">Manual (enter prices)</option>
+      </select>
+      <label for="apiKey">Finnhub API key:</label>
+      <input id="apiKey" class="input" placeholder="paste key here">
+      <button class="btn" id="saveKey">Save</button>
+      <span class="note">Get a free key at <a target="_blank" href="https://finnhub.io/">finnhub.io</a> → Profile → API Key.</span>
+    </div>
+
+    <table class="table" id="pnlTable">
+      <thead><tr>
+        <th>Symbol</th><th class="right">Weight</th><th class="right">Qty @ Baseline</th>
+        <th class="right">Baseline Price ($)</th><th class="right">Baseline Value ($)</th>
+        <th class="right">Live Price ($)</th><th class="right">Live Value ($)</th>
+        <th class="right">P&L %</th><th class="right">Alert ±%</th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot><tr>
+        <th>Total</th><th class="right" id="totW"></th><th></th><th></th>
+        <th class="right" id="totBase"></th><th></th><th class="right" id="totLive"></th>
+        <th class="right" id="totPL"></th><th></th>
+      </tr></tfoot>
+    </table>
+    <p class="tiny" id="baselineNote"></p>
+    <p class="note" id="sourceNote">Source: Auto</p>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Catalyst Timeline</h2>
+      <ul>
+        <li><strong>Section 232 Report Window:</strong> Oct–Dec 2025. <span id="countdown232"></span></li>
+        <li><strong>DOE Loans & Grants:</strong> Rolling announcements; watch ABAT, LAC, NVX.</li>
+        <li><strong>DPA / DoD Contracts:</strong> Ongoing; key for MP, LYSDY, NB.</li>
+        <li><strong>Election Policy Cycle:</strong> 2026 — resource independence rhetoric likely supportive.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Policy Exposure Map</h2>
+      <table class="matrix">
+        <thead><tr><th>Company</th><th>DOE Loans</th><th>DPA / DoD</th><th>IRA Credits</th><th>232 Tariff Sensitivity</th></tr></thead>
+        <tbody>
+          <tr><td>MP</td><td></td><td class="ok">High</td><td></td><td class="ok">High</td></tr>
+          <tr><td>LYSDY</td><td></td><td class="ok">High</td><td></td><td class="ok">High</td></tr>
+          <tr><td>ABAT</td><td class="ok">High</td><td></td><td class="ok">High</td><td class="warn">Medium</td></tr>
+          <tr><td>NVX</td><td class="warn">Medium</td><td></td><td class="ok">High</td><td class="ok">High</td></tr>
+          <tr><td>WWR</td><td class="warn">Medium</td><td></td><td></td><td class="ok">High</td></tr>
+          <tr><td>LAC</td><td class="ok">High</td><td></td><td class="warn">Medium</td><td class="warn">Medium</td></tr>
+          <tr><td>METC</td><td class="warn">Medium</td><td></td><td></td><td class="warn">Medium</td></tr>
+          <tr><td>NB</td><td class="warn">Medium</td><td class="ok">High</td><td></td><td class="warn">Medium</td></tr>
+        </tbody>
+      </table>
+      <p class="tiny">Legend: <span class="ok">High</span> = direct program fit; <span class="warn">Medium</span> = indirect/likely.</p>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Signal Lights</h2>
+      <ul>
+        <li><strong>Tariff Window (232):</strong> <span id="signal-232" class="badge">Calculating…</span></li>
+        <li><strong>DOE/DPA Announcements:</strong> <span class="badge">Rolling • Watch ABAT, LAC, NVX</span></li>
+        <li><strong>Public–Private Deals:</strong> <span class="badge">Ongoing • MP, LYSDY</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Alert Log</h2>
+      <ul id="alertLog" class="tiny" style="max-height:220px; overflow:auto; padding-left:18px; margin:0;"></ul>
+      <p class="tiny">Alerts trigger when a symbol's P&L % crosses your ±% threshold. Visual flash only.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer><div class="container"><p class="tiny">This dashboard is informational only and not investment advice.</p></div></footer>
+
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+// ---------- COUNTDOWN / SIGNALS ----------
+const target = new Date('2025-12-31T23:59:59Z').getTime();
+function updateCountdown() {
+  const now = new Date().getTime();
+  const diff = target - now;
+  const el = document.getElementById('countdown232');
+  if (!el) return;
+  if (diff <= 0) { el.textContent = 'Window complete'; return; }
+  const days = Math.floor(diff / (1000*60*60*24));
+  const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+  const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+  el.textContent = days + 'd ' + hours + 'h ' + mins + 'm';
+}
+updateCountdown(); setInterval(updateCountdown, 60000);
+
+// ---------- P&L + ALERT LOGIC ----------
+const symbols = [
+  { sym: 'MP' }, { sym: 'LYSDY' }, { sym: 'ABAT' }, { sym: 'NVX' },
+  { sym: 'WWR' }, { sym: 'LAC' }, { sym: 'METC' }, { sym: 'NB' }
+];
+const weights = { MP:0.20, LYSDY:0.15, ABAT:0.15, NVX:0.15, WWR:0.10, LAC:0.10, METC:0.10, NB:0.05 };
+const NOTIONAL = 1000;
+
+const LS = {
+  baseline: 'cm_baseline_v33',
+  baselineAt: 'cm_baselineAt_v33',
+  alerts: 'cm_alerts_v33',
+  alertLog: 'cm_alertlog_v33',
+  apiKey: 'cm_finnhub_key_v33',
+  source: 'cm_datasource_v33'
+};
+
+function fmt(n,d=2){ return Number(n).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d}); }
+function cls(v){ return v>=0 ? 'gain' : 'loss'; }
+function readLS(key,fallback){ try{ const x = JSON.parse(localStorage.getItem(key)); return x ?? fallback; }catch(e){ return fallback; } }
+function writeLS(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
+function alertLogPush(entry){ const log = readLS(LS.alertLog,[]); log.unshift(entry); writeLS(LS.alertLog, log.slice(0,100)); renderAlertLog(); }
+function renderAlertLog(){ const log = readLS(LS.alertLog,[]); const ul = document.getElementById('alertLog'); ul.innerHTML=''; log.forEach(e=>{ const li=document.createElement('li'); li.textContent = `[${new Date(e.t).toLocaleString()}] ${e.sym} ±${e.th}% → ${fmt(e.pl,2)}%`; ul.appendChild(li); }); }
+
+function baselineNote(){
+  const at = localStorage.getItem(LS.baselineAt);
+  const el = document.getElementById('baselineNote');
+  if (at) el.textContent = 'Baseline captured: ' + new Date(at).toLocaleString() + ' • Notional: $'+NOTIONAL;
+  else el.textContent = 'No baseline set yet. Click “Set Baseline Now” to lock today’s prices.';
+}
+
+const defaultAlerts = { MP:7, LYSDY:7, ABAT:10, NVX:10, WWR:15, LAC:10, METC:8, NB:12 };
+function getAlerts(){ const a = readLS(LS.alerts, {}); let changed=false; symbols.forEach(s=>{ if(a[s.sym]==null){ a[s.sym]=defaultAlerts[s.sym]??10; changed=true; } }); if(changed) writeLS(LS.alerts, a); return a; }
+function setAlert(sym, th){ const a = getAlerts(); a[sym]=th; writeLS(LS.alerts, a); }
+
+function setSourceNote(txt){ const el=document.getElementById('sourceNote'); if(el) el.textContent='Source: ' + txt; }
+
+// ---- Quote fetchers ----
+function yahooUrl(tickers){ return `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(tickers.join(','))}`; }
+function withProxy(url, proxy){
+  if (proxy === 'direct') return url;
+  if (proxy === 'jina')   return 'https://r.jina.ai/' + url;
+  if (proxy === 'allorigins') return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+  if (proxy === 'thingproxy') return 'https://thingproxy.freeboard.io/fetch/' + url;
+  return url;
+}
+const proxyOrder = ['direct','jina','allorigins','thingproxy'];
+
+async function fetchYahooQuotes(tickers){
+  let lastError=''; 
+  for (const p of proxyOrder) {
+    try {
+      const url = withProxy(yahooUrl(tickers), p);
+      const res = await fetch(url, { cache: 'no-store' });
+      const text = await res.text();
+      if (!text.trim().startsWith('{')) throw new Error('Non-JSON response');
+      const json = JSON.parse(text);
+      const by={}; (json.quoteResponse?.result||[]).forEach(q=>{ by[q.symbol]=q.regularMarketPrice ?? q.ask ?? q.bid; });
+      const count = Object.values(by).filter(Boolean).length;
+      if (count === 0) throw new Error('Empty result');
+      setSourceNote(p==='direct' ? 'Yahoo (direct)' : `Yahoo via ${p}`);
+      return by;
+    } catch(e){ lastError = e.message || String(e); continue; }
+  }
+  throw new Error('All Yahoo routes failed: ' + lastError);
+}
+
+async function fetchFinnhubQuotes(tickers, key){
+  const by = {};
+  for (const t of tickers) {
+    try{
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(t)}&token=${encodeURIComponent(key)}`, { cache:'no-store' });
+      const j = await res.json();
+      const price = j.c; // current
+      if (price) by[t] = price;
+    }catch(e){}
+  }
+  const count = Object.values(by).filter(Boolean).length;
+  if (count === 0) throw new Error('Finnhub returned no prices (check key or symbols).');
+  setSourceNote('Finnhub');
+  return by;
+}
+
+async function fetchManualQuotes(tickers){
+  const by = {};
+  for (const t of tickers) {
+    const v = prompt(`Enter live price for ${t}:`, "");
+    if (v == null) continue;
+    const num = Number(v);
+    if (!isNaN(num) && num > 0) by[t] = num;
+  }
+  const count = Object.values(by).filter(Boolean).length;
+  if (count === 0) throw new Error('No manual prices entered.');
+  setSourceNote('Manual (user input)');
+  return by;
+}
+
+async function fetchQuotesAuto(tickers){
+  const key = localStorage.getItem(LS.apiKey);
+  if (key) {
+    try { return await fetchFinnhubQuotes(tickers, key); } catch(e){}
+  }
+  try { return await fetchFinnhubQuotes(tickers, ''); } catch(e){}
+  try { return await fetchYahooQuotes(tickers); } catch(e){}
+  return await fetchManualQuotes(tickers);
+}
+
+// ---- Baseline & Render ----
+function buildBaseline(quotes) {
+  const baseline = {};
+  symbols.forEach(s => {
+    const px = quotes[s.sym];
+    if (!px) return;
+    const alloc = NOTIONAL * weights[s.sym];
+    const qty = alloc / px;
+    baseline[s.sym] = { price: px, qty: qty };
+  });
+  writeLS(LS.baseline, baseline);
+  writeLS(LS.baselineAt, new Date().toISOString());
+  return baseline;
+}
+function readBaseline(){ return readLS(LS.baseline, null); }
+
+async function renderPnL() {
+  const tbody = document.querySelector('#pnlTable tbody');
+  tbody.innerHTML = '<tr><td colspan="9">Loading quotes…</td></tr>';
+  try {
+    const tickers = symbols.map(s=>s.sym);
+    const source = localStorage.getItem(LS.source) || 'auto';
+    const key = localStorage.getItem(LS.apiKey) || '';
+    let quotes = {};
+    if (source === 'finnhub') {
+      if (!key) throw new Error('Finnhub key not set. Switch to Auto or Yahoo, or click Save after pasting your key.');
+      quotes = await fetchFinnhubQuotes(tickers, key);
+    } else if (source === 'yahoo') {
+      quotes = await fetchYahooQuotes(tickers);
+    } else if (source === 'manual') {
+      quotes = await fetchManualQuotes(tickers);
+    } else {
+      quotes = await fetchQuotesAuto(tickers);
+    }
+
+    let base = readBaseline();
+    if (!base) { base = buildBaseline(quotes); }
+    baselineNote();
+    const alerts = getAlerts();
+
+    let totW=0, totBase=0, totLive=0;
+    tbody.innerHTML = '';
+    symbols.forEach(s => {
+      const live = quotes[s.sym];
+      const w = weights[s.sym];
+      const b = base[s.sym];
+      if (!live || !b) return;
+      const baseVal = b.qty * b.price;
+      const liveVal = b.qty * live;
+      const plPct = (liveVal - baseVal) / baseVal * 100;
+
+      totW += w*100; totBase += baseVal; totLive += liveVal;
+
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + s.sym;
+      tr.innerHTML = `
+        <td>${s.sym}</td>
+        <td class="right">${fmt(w*100,1)}%</td>
+        <td class="right">${fmt(b.qty,4)}</td>
+        <td class="right">${fmt(b.price)}</td>
+        <td class="right">${fmt(baseVal)}</td>
+        <td class="right">${fmt(live)}</td>
+        <td class="right">${fmt(liveVal)}</td>
+        <td class="right ${cls(plPct)}" id="pl-${s.sym}">${fmt(plPct,2)}%</td>
+        <td class="right"><input type="number" step="0.5" min="1" id="alert-${s.sym}" class="alertInput" value="${alerts[s.sym]}"><span class="inline-note">±%</span></td>
+      `;
+      tbody.appendChild(tr);
+
+      const th = Number(alerts[s.sym]);
+      if (th && Math.abs(plPct) >= th) {
+        const row = tr; if (plPct >= 0) row.classList.add('flashUp'); else row.classList.add('flashDown');
+        alertLogPush({ t: new Date().toISOString(), sym: s.sym, th: th, pl: plPct });
+      }
+    });
+
+    document.getElementById('totW').textContent = fmt(totW,1)+'%';
+    document.getElementById('totBase').textContent = '$'+fmt(totBase);
+    document.getElementById('totLive').textContent = '$'+fmt(totLive);
+    const totPl = (totLive - totBase) / (totBase || 1) * 100;
+    document.getElementById('totPL').innerHTML = `<span class="${cls(totPl)}">${fmt(totPl,2)}%</span>`;
+
+    // Wire up inputs
+    symbols.forEach(s => {
+      const inp = document.getElementById('alert-'+s.sym);
+      inp.addEventListener('change', e => {
+        const v = Number(e.target.value);
+        if (!isNaN(v) && v > 0) setAlert(s.sym, v);
+      });
+    });
+
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : 'Unknown error';
+    tbody.innerHTML = `<tr><td colspan="9">Quote fetch failed (${msg}). Try a different data source or enter manual prices.</td></tr>`;
+  }
+}
+
+document.getElementById('saveKey').addEventListener('click', () => {
+  const val = document.getElementById('apiKey').value.trim();
+  if (val) localStorage.setItem(LS.apiKey, val);
+  alert('Saved. Source set to Finnhub.'); 
+  localStorage.setItem(LS.source, 'finnhub');
+  document.getElementById('sourceSel').value = 'finnhub';
+  document.getElementById('sourceNote').textContent = 'Source: Finnhub';
+});
+
+const sel = document.getElementById('sourceSel');
+sel.addEventListener('change', (e) => {
+  const v = e.target.value;
+  localStorage.setItem(LS.source, v);
+  document.getElementById('sourceNote').textContent = 'Source: ' + (v==='auto'?'Auto':v.charAt(0).toUpperCase()+v.slice(1));
+  renderPnL();
+});
+
+// Initialize selector & key field from LS
+(function initSource(){
+  const saved = localStorage.getItem(LS.source) || 'auto';
+  sel.value = saved;
+  const k = localStorage.getItem(LS.apiKey) || '';
+  document.getElementById('apiKey').value = k;
+})();
+
+// Baseline buttons
+document.getElementById('setBaseline').addEventListener('click', async () => {
+  try{
+    const tickers = symbols.map(s=>s.sym);
+    const source = localStorage.getItem(LS.source) || 'auto';
+    let quotes = {};
+    if (source === 'finnhub') {
+      const key = localStorage.getItem(LS.apiKey) || '';
+      if (!key) { alert('Set your Finnhub key first or switch data source.'); return; }
+      quotes = await fetchFinnhubQuotes(tickers, key);
+    } else if (source === 'yahoo') {
+      quotes = await fetchYahooQuotes(tickers);
+    } else if (source === 'manual') {
+      quotes = await fetchManualQuotes(tickers);
+    } else {
+      quotes = await fetchQuotesAuto(tickers);
+    }
+    buildBaseline(quotes); baselineNote(); renderPnL();
+  } catch (e) { alert('Baseline capture failed: ' + (e.message || e)); }
+});
+document.getElementById('resetBaseline').addEventListener('click', () => {
+  localStorage.removeItem(LS.baseline); localStorage.removeItem(LS.baselineAt); baselineNote(); renderPnL();
+});
+
+renderAlertLog();
+renderPnL();
+</script>
+
+<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+{"symbols":[["NYSE:MP|1D"],["OTC:LYSDY|1D"],["NASDAQ:ABAT|1D"],["NASDAQ:NVX|1D"],["AMEX:WWR|1D"],["NYSE:LAC|1D"],["NASDAQ:METC|1D"],["NASDAQ:NB|1D"]],"chartOnly":false,"width":"100%","height":"520","locale":"en","colorTheme":"dark","autosize":true,"showVolume":true,"showMA":false,"hideDateRanges":false,"hideMarketStatus":false,"scalePosition":"right","scaleMode":"Normal","fontFamily":"inherit","noTimeScale":false,"valuesTracking":"1","changeMode":"price-and-percent","chartType":"area","lineWidth":2}
+</script>
+
+<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+{"symbols":[{"proName":"NYSE:MP","title":"MP"},{"proName":"OTC:LYSDY","title":"LYSDY"},{"proName":"NASDAQ:ABAT","title":"ABAT"},{"proName":"NASDAQ:NVX","title":"NVX"},{"proName":"AMEX:WWR","title":"WWR"},{"proName":"NYSE:LAC","title":"LAC"},{"proName":"NASDAQ:METC","title":"METC"},{"proName":"NASDAQ:NB","title":"NB"},{"proName":"AMEX:URA","title":"URA"},{"proName":"AMEX:REMX","title":"REMX"}],"colorTheme":"dark","isTransparent":false,"displayMode":"adaptive","locale":"en"}
+</script>
+
+</body>
+</html>
