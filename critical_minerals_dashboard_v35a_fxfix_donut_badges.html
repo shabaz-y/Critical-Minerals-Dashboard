@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Critical Minerals Dashboard — v3.5a (FX Fix + Donut + Badges)</title>
+<meta http-equiv="refresh" content="900">
+<style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e6edf3}
+header{padding:24px;background:#11192d;border-bottom:1px solid #23324f}
+h1{margin:0 0 6px 0;font-size:24px} h2{margin-top:24px;font-size:20px}
+p,li{color:#b8c3d6} .container{max-width:1280px;margin:0 auto;padding:16px 24px 40px}
+.card{background:#0f1a33;border:1px solid #22345a;border-radius:12px;padding:16px}
+.table{width:100%;border-collapse:collapse} .table th,.table td{border-bottom:1px solid #23324f;padding:8px 10px}
+.tiny{font-size:12px;color:#8aa0c8} .right{text-align:right} .gain{color:#86efac} .loss{color:#fca5a5}
+.btn{background:#1a2b4f;color:#cfe0ff;border:1px solid #2c4578;border-radius:8px;padding:8px 12px;cursor:pointer} .btn:hover{background:#233a6a}
+.input{background:#0f1a33;border:1px solid #2c4578;color:#cfe0ff;padding:6px 8px;border-radius:6px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.badge{padding:3px 8px;border-radius:6px;font-weight:600;margin-left:6px;border:1px solid #2c4578}
+.badgeUp{background:#10351f;color:#86efac;border-color:#265a34}
+.badgeDown{background:#3a1b1b;color:#fca5a5;border-color:#6b2b2b}
+.pill{display:inline-block;padding:4px 10px;border:1px solid #2d4472;border-radius:999px;margin-right:8px;font-size:12px;color:#c8d6ef}
+.donutWrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.legend{display:grid;grid-template-columns:auto auto;gap:6px 12px}
+.legend .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+@keyframes flashGreen{0%{background:#0f1a33}50%{background:#10351f}100%{background:#0f1a33}}
+@keyframes flashRed{0%{background:#0f1a33}50%{background:#3a1b1b}100%{background:#0f1a33}}
+.flashUp{animation:flashGreen 1.2s ease-in-out 4} .flashDown{animation:flashRed 1.2s ease-in-out 4}
+.alertInput{width:70px;background:#0f1a33;border:1px solid #2c4578;color:#cfe0ff;padding:6px 8px;border-radius:6px}
+.inline-note{font-size:12px;color:#8aa0c8;margin-left:8px}
+</style>
+</head>
+<body>
+<header><div class="container">
+  <h1>U.S. Policy Critical Minerals — v3.5a <span class="badge">FX‑safe + Donut + Badges</span></h1>
+  <p class="tiny">Exact Trading212 GBP fills locked; always fetches FX via Yahoo. Toggle <em>Live FX</em> vs <em>Fixed FX</em> to match your broker.</p>
+  <div><span class="pill">MP</span><span class="pill">LYSDY</span><span class="pill">ABAT</span><span class="pill">NVX</span><span class="pill">WWR</span><span class="pill">LAC</span><span class="pill">METC</span><span class="pill">NB</span></div>
+</div></header>
+
+<div class="container">
+  <!-- Donut + FX controls -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h2 style="margin:0;">Pie Weightings</h2>
+      <div class="row">
+        <label>Display:</label>
+        <select id="ccy" class="input"><option value="GBP">GBP</option><option value="USD">USD</option></select>
+        <label style="margin-left:8px;">FX mode:</label>
+        <select id="fxmode" class="input"><option value="live">Live FX</option><option value="fixed">Fixed FX</option></select>
+        <label for="fixedfx">GBPUSD:</label><input id="fixedfx" class="input" placeholder="e.g. 1.3100" style="width:110px">
+        <button class="btn" id="savefx">Save</button>
+      </div>
+    </div>
+    <div class="donutWrap">
+      <svg id="donut" width="180" height="180" viewBox="0 0 42 42"></svg>
+      <div class="legend" id="legend"></div>
+      <div class="tiny">Target weights: MP 20%, LYSDY 15%, ABAT 15%, NVX 15%, WWR 10%, LAC 10%, METC 10%, NB 5%.</div>
+    </div>
+  </div>
+
+  <!-- P&L + Alerts -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <h2 style="margin:0;">Portfolio P&L (Preset Baseline)</h2>
+      <div class="row">
+        <label>Data source:</label>
+        <select id="sourceSel" class="input">
+          <option value="auto">Auto (Finnhub→Yahoo→Manual)</option>
+          <option value="finnhub">Finnhub (API key)</option>
+          <option value="yahoo">Yahoo (multi-proxy)</option>
+          <option value="manual">Manual (type prices)</option>
+        </select>
+        <label>Finnhub API key:</label><input id="apiKey" class="input" placeholder="optional" style="min-width:220px">
+        <button class="btn" id="saveKey">Save</button>
+        <button class="btn" id="recalc">Recalculate</button>
+      </div>
+    </div>
+    <p class="tiny">Baseline = your exact paid price (GBP, incl. fees) × exact quantity. Live quotes fetched in USD; FX always fetched via Yahoo.</p>
+    <table class="table" id="pnlTable">
+      <thead><tr>
+        <th>Symbol</th><th class="right">Qty</th><th class="right">Baseline £/sh</th><th class="right">Baseline £</th>
+        <th class="right">Live Price</th><th class="right">Live Value</th><th class="right">P&L %</th><th>Status</th><th class="right">Alert ±%</th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot><tr>
+        <th>Total</th><th></th><th></th><th class="right" id="totBase"></th>
+        <th></th><th class="right" id="totLive"></th><th class="right" id="totPL"></th>
+        <th id="totBadge"></th><th></th>
+      </tr></tfoot>
+    </table>
+    <p class="tiny" id="fxNote">FX: loading…</p>
+    <p class="tiny" id="sourceNote">Source: Auto</p>
+    <div class="card" style="margin-top:12px;">
+      <h3 style="margin-top:0;">Alert Log</h3>
+      <ul id="alertLog" class="tiny" style="max-height:180px; overflow:auto; padding-left:18px; margin:0;"></ul>
+      <p class="tiny">Rows flash when your P&L crosses the ±% threshold you set per symbol.</p>
+    </div>
+  </div>
+</div>
+
+<footer><div class="container"><p class="tiny">This dashboard is informational only and not investment advice.</p></div></footer>
+
+<script>
+const BASELINE = {"NVX":{"qty":116.02665722,"gbp_price":1.318662483828128},"WWR":{"qty":103.71416362,"gbp_price":0.9834722321410165},"LAC":{"qty":14.45613944,"gbp_price":7.055825687303968},"MP":{"qty":3.73002456,"gbp_price":54.69132889570036},"ABAT":{"qty":39.26264742,"gbp_price":3.896833505986744},"METC":{"qty":3.554888501,"gbp_price":28.692883045785294},"NB":{"qty":7.63016615,"gbp_price":6.683995996600939},"LYSDY":{"qty":15.45599858,"gbp_price":9.899069232445543}};
+const WEIGHTS = {"MP":0.2,"LYSDY":0.15,"ABAT":0.15,"NVX":0.15,"WWR":0.1,"LAC":0.1,"METC":0.1,"NB":0.05};
+
+// --- Local storage keys
+const LS = { alerts:'cm_v35a_alerts', log:'cm_v35a_alertlog', ccy:'cm_v35a_ccy', source:'cm_v35a_source', key:'cm_v35a_finnhub_key', fxmode:'cm_v35a_fxmode', fixed:'cm_v35a_fixedfx' };
+const defaultAlerts = { MP:7, LYSDY:7, ABAT:10, NVX:10, WWR:15, LAC:10, METC:8, NB:12 };
+
+// --- Helpers
+function fmt(n,d=2){ return Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function cls(v){ return v>=0?'gain':'loss'; }
+function readLS(k,f){ try{const x=JSON.parse(localStorage.getItem(k)); return (x===null||x===undefined)?f:x; }catch(e){ return f; } }
+function writeLS(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+// --- Donut (SVG arcs)
+function drawDonut(){
+  const svg = document.getElementById('donut'); svg.innerHTML='';
+  const legend = document.getElementById('legend'); legend.innerHTML='';
+  const colors = ['#60a5fa','#34d399','#f472b6','#fbbf24','#a78bfa','#f87171','#22d3ee','#84cc16'];
+  const syms = Object.keys(WEIGHTS);
+  let start=0, i=0;
+  syms.forEach(s=>{
+    const val = WEIGHTS[s]*100;
+    const angle = val/100*360;
+    const end = start + angle;
+    const large = angle>180?1:0;
+    const r=16, cx=21, cy=21;
+    const startRad = (start-90)*Math.PI/180, endRad=(end-90)*Math.PI/180;
+    const x1=cx+r*Math.cos(startRad), y1=cy+r*Math.sin(startRad);
+    const x2=cx+r*Math.cos(endRad), y2=cy+r*Math.sin(endRad);
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${cx} ${cy} Z`);
+    path.setAttribute('fill', colors[i%colors.length]);
+    svg.appendChild(path);
+
+    const sw = document.createElement('span'); sw.className='sw'; sw.style.background=colors[i%colors.length];
+    const lbl = document.createElement('span'); lbl.textContent = `${s} ${fmt(val,0)}%`;
+    const wrap = document.createElement('div'); wrap.appendChild(sw); wrap.appendChild(lbl);
+    legend.appendChild(wrap);
+
+    start=end; i++;
+  });
+  const hole = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  hole.setAttribute('cx','21'); hole.setAttribute('cy','21'); hole.setAttribute('r','10'); hole.setAttribute('fill','#0b1220');
+  svg.appendChild(hole);
+}
+
+// --- Alerts
+function getAlerts(){ const a=readLS(LS.alerts,{}); let ch=false; Object.keys(defaultAlerts).forEach(s=>{ if(a[s]==null){ a[s]=defaultAlerts[s]; ch=true; } }); if(ch) writeLS(LS.alerts,a); return a; }
+function setAlert(sym,th){ const a=getAlerts(); a[sym]=th; writeLS(LS.alerts,a); }
+function logPush(e){ const log=readLS(LS.log,[]); log.unshift(e); writeLS(LS.log, log.slice(0,100)); renderLog(); }
+function renderLog(){ const ul=document.getElementById('alertLog'); const log=readLS(LS.log,[]); ul.innerHTML=''; log.forEach(e=>{ const li=document.createElement('li'); li.textContent=`[${new Date(e.t).toLocaleString()}] ${e.sym} ±${e.th}% → ${fmt(e.pl,2)}%`; ul.appendChild(li); }); }
+
+// --- FX via Yahoo only (safe)
+function yahooUrl(t){ return `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(t.join(','))}`; }
+function withProxy(url,p){ if(p==='direct')return url; if(p==='jina')return 'https://r.jina.ai/'+url; if(p==='allorigins')return 'https://api.allorigins.win/raw?url='+encodeURIComponent(url); if(p==='thing')return 'https://thingproxy.freeboard.io/fetch/'+url; }
+const PROX=['direct','jina','allorigins','thing'];
+async function fetchFX(){
+  let last='';
+  for(const p of PROX){
+    try{
+      const res=await fetch(withProxy(yahooUrl(['GBPUSD=X']), p), {cache:'no-store'});
+      const txt=await res.text(); if(!txt.trim().startsWith('{')) throw new Error('Non-JSON');
+      const j=JSON.parse(txt); const r=j.quoteResponse.result?.[0]; const price=r?.regularMarketPrice ?? r?.ask ?? r?.bid;
+      if(price){ return {fx: price, via: (p==='direct'?'Yahoo (direct)':'Yahoo via '+p)}; }
+      last='empty';
+    }catch(e){ last=e.message; }
+  }
+  throw new Error('FX fetch failed: '+last);
+}
+
+// --- Quotes (Finnhub or Yahoo or Manual); FX handled separately
+async function fetchYahooQuotes(tickers){
+  let last='';
+  for(const p of PROX){
+    try{
+      const res=await fetch(withProxy(yahooUrl(tickers), p), {cache:'no-store'});
+      const txt=await res.text(); if(!txt.trim().startsWith('{')) throw new Error('Non-JSON');
+      const j=JSON.parse(txt); const out={}; (j.quoteResponse.result||[]).forEach(q=>{ out[q.symbol]=q.regularMarketPrice ?? q.ask ?? q.bid; });
+      if(Object.keys(out).length) return {via:(p==='direct'?'Yahoo (direct)':'Yahoo via '+p), data: out};
+      last='empty';
+    }catch(e){ last=e.message; }
+  }
+  throw new Error('Yahoo quotes failed: '+last);
+}
+
+async function fetchFinnhubQuotes(tickers, key){
+  const out={};
+  for(const t of tickers){
+    try{
+      const r=await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(t)}&token=${encodeURIComponent(key)}`, {cache:'no-store'});
+      const j=await r.json(); if(j && j.c) out[t]=j.c;
+    }catch(e){}
+  }
+  if(Object.keys(out).length===0) throw new Error('Finnhub returned no prices.');
+  return {via:'Finnhub', data: out};
+}
+
+async function fetchManual(tickers){
+  const out={}; for(const t of tickers){ const v=prompt(`Enter price for ${t}:`,""); if(v==null) continue; const n=Number(v); if(!isNaN(n)&&n>0) out[t]=n; }
+  if(Object.keys(out).length===0) throw new Error('No manual prices entered.');
+  return {via:'Manual', data: out};
+}
+
+async function getQuotes(){
+  const src=readLS(LS.source,'auto'); const key=readLS(LS.key,'');
+  const tickers=Object.keys(BASELINE);
+  if(src==='finnhub'){
+    try{ return await fetchFinnhubQuotes(tickers, key); }catch(e){ return await fetchYahooQuotes(tickers); }
+  }else if(src==='yahoo'){ return await fetchYahooQuotes(tickers); }
+  else if(src==='manual'){ return await fetchManual(tickers); }
+  // auto
+  if(key){ try{ return await fetchFinnhubQuotes(tickers, key); }catch(e){} }
+  try{ return await fetchYahooQuotes(tickers); }catch(e){}
+  return await fetchManual(tickers);
+}
+
+// --- Controls
+const ccySel=document.getElementById('ccy'); ccySel.value=readLS(LS.ccy,'GBP');
+ccySel.addEventListener('change',()=>{ writeLS(LS.ccy, ccySel.value); render(); });
+const fxSel=document.getElementById('fxmode'); fxSel.value=readLS(LS.fxmode,'live');
+const fxInp=document.getElementById('fixedfx'); fxInp.value = readLS(LS.fixed,'');
+document.getElementById('savefx').addEventListener('click',()=>{ writeLS(LS.fxmode, fxSel.value); writeLS(LS.fixed, fxInp.value.trim()); render(); });
+
+const sel=document.getElementById('sourceSel'); sel.value=readLS(LS.source,'auto'); sel.addEventListener('change',e=>{ writeLS(LS.source, e.target.value); render(); });
+document.getElementById('saveKey').addEventListener('click',()=>{ const v=document.getElementById('apiKey').value.trim(); if(v) writeLS(LS.key, v); writeLS(LS.source,'finnhub'); sel.value='finnhub'; render(); });
+document.getElementById('recalc').addEventListener('click',()=> render());
+
+// --- Rendering
+function renderAlertsInputs(){
+  const a=getAlerts();
+  Object.keys(BASELINE).forEach(sym=>{
+    const inp=document.getElementById('alert-'+sym);
+    if(inp){ inp.value=a[sym]??10; inp.addEventListener('change',e=>{ const v=Number(e.target.value); if(!isNaN(v)&&v>0) setAlert(sym,v); }); }
+  });
+}
+function badge(v){
+  const b=document.createElement('span'); b.className='badge ' + (v>=0?'badgeUp':'badgeDown'); b.textContent = v>=0?'UP':'DOWN'; return b;
+}
+
+async function render(){
+  drawDonut();
+  renderLog();
+  const tbody=document.querySelector('#pnlTable tbody'); tbody.innerHTML='<tr><td colspan="9">Loading…</td></tr>';
+  try{
+    // FX always via Yahoo
+    const {fx, via:fxVia} = await fetchFX();
+    document.getElementById('fxNote').textContent = 'FX (USD per £): '+fmt(fx,4)+' • '+fxVia;
+
+    // Quotes by selected route
+    const {via, data} = await getQuotes();
+    document.getElementById('sourceNote').textContent='Source: '+via;
+
+    // Currency view + FX mode
+    const ccy=readLS(LS.ccy,'GBP');
+    const mode=readLS(LS.fxmode,'live');
+    const fixedVal=parseFloat(readLS(LS.fixed,''));
+    const useFx = (mode==='fixed' && fixedVal>0) ? fixedVal : fx;
+    const toDisp = usd => ccy==='USD' ? usd : (usd / useFx);
+    const dispSym = ccy==='USD' ? '$' : '£';
+
+    const alerts=getAlerts();
+    let totBaseGBP=0, totBaseDisp=0, totLiveDisp=0;
+    tbody.innerHTML='';
+
+    for(const sym of Object.keys(BASELINE)){
+      const bl=BASELINE[sym]; const qty=bl.qty; const baseGBP=bl.gbp_price;
+      const liveUSD=data[sym]; if(!qty || !liveUSD) continue;
+
+      const liveDisp = toDisp(liveUSD);
+      const baseValGBP = qty*baseGBP;
+      const baseValDisp = (ccy==='USD') ? baseValGBP*useFx : baseValGBP;
+      const liveValDisp = qty*liveDisp;
+      const plPct = (liveValDisp - baseValDisp) / (baseValDisp||1) * 100;
+
+      totBaseGBP += baseValGBP; totBaseDisp += baseValDisp; totLiveDisp += liveValDisp;
+
+      const tr=document.createElement('tr');
+      tr.id='row-'+sym;
+      tr.innerHTML = `
+        <td>${sym}</td>
+        <td class="right">${fmt(qty,4)}</td>
+        <td class="right">£${fmt(baseGBP)}</td>
+        <td class="right">£${fmt(baseValGBP)}</td>
+        <td class="right">${dispSym}${fmt(liveDisp)}</td>
+        <td class="right">${dispSym}${fmt(liveValDisp)}</td>
+        <td class="right ${cls(plPct)}">${fmt(plPct,2)}%</td>
+        <td id="badge-${sym}"></td>
+        <td class="right"><input id="alert-${sym}" class="alertInput" type="number" step="0.5" min="1"><span class="inline-note">±%</span></td>`;
+      tbody.appendChild(tr);
+
+      // badge & threshold
+      document.getElementById('badge-'+sym).appendChild(badge(plPct));
+      const th = Number(alerts[sym]);
+      if(th && Math.abs(plPct)>=th){
+        if(plPct>=0) tr.classList.add('flashUp'); else tr.classList.add('flashDown');
+        logPush({t:new Date().toISOString(), sym, th, pl:plPct});
+      }
+    }
+
+    document.getElementById('totBase').textContent='£'+fmt(totBaseGBP);
+    document.getElementById('totLive').textContent=dispSym+fmt(totLiveDisp);
+    const totPl = (totLiveDisp - totBaseDisp) / (totBaseDisp||1) * 100;
+    document.getElementById('totPL').innerHTML = `<span class="${cls(totPl)}">${fmt(totPl,2)}%</span>`;
+    const tb=document.getElementById('totBadge'); tb.innerHTML=''; tb.appendChild(badge(totPl));
+
+    renderAlertsInputs();
+  }catch(e){
+    tbody.innerHTML = `<tr><td colspan="9">Failed to load quotes/FX: ${e.message}</td></tr>`;
+  }
+}
+
+render();
+</script>
+</body>
+</html>
